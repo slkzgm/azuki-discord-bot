@@ -1,5 +1,7 @@
 # Azuki-Market-Discord-Bot
 
+![image](https://github.com/slkzgm/azuki-discord-bot/assets/105301169/2b29e3cb-84ae-4cec-99c0-cd4398be1cae)
+
 ## Description
 
 Introducing an advanced Discord bot designed to send alerts for Azuki listings and sales events. It leverages the power of the Blur websocket, supplementing events with additional details such as Green and Mystery Beans claim status, and metadata.
