@@ -21,7 +21,7 @@ webSocketServer.on('error', error => {
 
 
 // BLUR ACTIVITY WEBSOCKET \\
-const BLUR_WS = 'wss://feeds.prod.blur.io/socket.io/?tabId=xu64ulliSFvp&storageId=dvXl7dxQaJCS&EIO=4&transport=websocket';
+const BLUR_WS = process.env.BLUR_WEBSOCKET;
 
 // UTILS
 const parseBuffer = (buffer) => {
@@ -67,21 +67,33 @@ async function handleSaleEvent(item) {
     const {tokenId, marketplace, price, fromAddress, toAddress, canClaimGreen, canClaimMystery, metadata} = item;
 
     try {
-        DiscordClient.getChannel().send({embeds: [createSaleEmbedMsg({
-                tokenId,
-                marketplace,
-                price,
-                buyer: toAddress,
-                seller: fromAddress,
-                canClaimGreen,
-                canClaimMystery,
-                metadata
-            })]});
+        const embedMsg = createSaleEmbedMsg({
+            tokenId,
+            marketplace,
+            price,
+            buyer: toAddress,
+            seller: fromAddress,
+            canClaimGreen,
+            canClaimMystery,
+            metadata
+        });
+
+        const {base, sales} = DiscordClient.getChannel();
+
+        if (base) {
+            base.send({embeds: [embedMsg]});
+        }
+
+        if (sales) {
+            sales.send({embeds: [embedMsg]});
+        }
+
         webSocketServer.clients.forEach(client => {
             if (client.readyState === WebSocket.OPEN) {
                 client.send(JSON.stringify(item));
             }
         })
+
         console.log(`${JSON.stringify(item)} sold`);
     } catch (e) {
         console.error(e);
@@ -92,21 +104,41 @@ async function handleOrderCreatedEvent(item) {
     const {tokenId, marketplace, price, fromAddress, toAddress, canClaimGreen, canClaimMystery, metadata} = item;
 
     try {
-        DiscordClient.getChannel().send({embeds: [createListingEmbedMsg({
-                tokenId,
-                marketplace,
-                price,
-                buyer: toAddress,
-                seller: fromAddress,
-                canClaimGreen,
-                canClaimMystery,
-                metadata
-            })]});
+        const embedMsg = createListingEmbedMsg({
+            tokenId,
+            marketplace,
+            price,
+            buyer: toAddress,
+            seller: fromAddress,
+            canClaimGreen,
+            canClaimMystery,
+            metadata
+        });
+
+        const {base, listings, greenBeans, mysteryBeans} = DiscordClient.getChannel();
+
+        if (base) {
+            base.send({embeds: [embedMsg]});
+        }
+
+        if (listings) {
+            listings.send({embeds: [embedMsg]});
+        }
+
+        if (greenBeans && canClaimGreen) {
+            greenBeans.send({embeds: [embedMsg]});
+        }
+
+        if (mysteryBeans && canClaimMystery) {
+            mysteryBeans.send({embeds: [embedMsg]});
+        }
+
         webSocketServer.clients.forEach(client => {
             if (client.readyState === WebSocket.OPEN) {
                 client.send(JSON.stringify(item));
             }
         })
+
         console.log(`${JSON.stringify(item)} listed`);
     } catch (e) {
         console.error(e);

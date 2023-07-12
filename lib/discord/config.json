@@ -5,7 +5,11 @@
     "thumbnailBaseUrl": "https://ipfs.io/ipfs/QmYDvPAXtiJg7s8JdRBSLWdgSphQdac8j1YuQNNxcGE1hg/"
   },
   "channelIds": {
-    "baseChannel": "1126923887838494851"
+    "baseChannel": "",
+    "listingsChannel": "1128449739571068969",
+    "salesChannel": "1128449750690189412",
+    "greenBeanListingsChannel": "1128449719446806539",
+    "mysteryBeanListingsChannel": "1128449719446806539"
   },
   "author": {
     "name": "AzukiActivityBot",
