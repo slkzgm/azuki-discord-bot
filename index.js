@@ -1,17 +1,15 @@
-require('dotenv').config()
-const WebSocket = require('ws');
-const {getMetadata, greenBeanCheck, mysteryBeanCheck} = require("./lib/ethereum/azukiLib");
-const DiscordClient = require("./lib/discord/discordClient");
-const {createSaleEmbedMsg, createListingEmbedMsg} = require("./lib/discord/utils");
+import dotenv from 'dotenv';
+dotenv.config();
+import WebSocket from 'ws';
+import {getMetadata, greenBeanCheck, mysteryBeanCheck, prepareIpfsNode, ready} from './lib/ethereum/azukiLib.js';
+import * as DiscordClient from './lib/discord/discordClient.js';
+import { createSaleEmbedMsg, createListingEmbedMsg } from './lib/discord/utils.js';
 
 // ENHANCED WEBSOCKET \\
 const webSocketServer = new WebSocket.Server({ port: process.env.ENHANCED_WS_PORT });
 
 webSocketServer.on('connection', ws => {
     console.log('Enhanced websocket connected');
-    ws.on('close', () => {
-        console.log('Enhanced websocket disconnected');
-    })
 });
 
 webSocketServer.on('error', error => {
@@ -182,10 +180,56 @@ async function handleFortyTwo(fortyTwoEvent) {
     }
 }
 
+async function handleClose(code, reason) {
+    console.log(`Websocket closed with code ${code} and reason: ${reason}`);
+
+    console.log('Reconnecting...');
+    setTimeout(() => {
+        connect();
+    }, 1000);
+}
+async function handleMessage(ws, data) {
+    const event = parseBuffer(data);
+
+    // check for subscription success
+    if (event.event === 'subscribed') {
+        console.log('Successfully subscribed!');
+        clearTimeout(retryTimeout);
+        subscriptionRetryCount = 0;
+    }
+
+    switch (event.code) {
+        // PONG
+        case 2:
+            ws.send(3);
+            break;
+        // EVENT
+        case 42:
+            await handleFortyTwo(event);
+            break;
+        default:
+            return;
+    }
+}
+async function handleOpen(ws) {
+    console.log('Connected');
+    ws.send(40);
+    console.log('Subscribing to the activity feed...');
+    await subscribe(ws);
+}
+async function handleError(err) {
+    console.error(err)
+}
+
 const connect = async () => {
     try {
         // handle websocket stream
         const ws = new WebSocket(BLUR_WS);
+
+        ws.removeListener('error', handleError);
+        ws.removeListener('open', handleOpen);
+        ws.removeListener('message', handleMessage);
+        ws.removeListener('close', handleClose);
 
         // prepare discord client
         if (!DiscordClient.isReady()) {
@@ -198,49 +242,20 @@ const connect = async () => {
             }
         }
 
-        ws.on('error', (err) => {
-            console.error(err)
-        });
+        // prepare IPFS node
+        if (!ready) {
+            await prepareIpfsNode();
+        } else {
+            console.log('IPFS node already running.');
+        }
 
-        ws.on('open', async () => {
-            console.log('Connected');
-            ws.send(40);
-            console.log('Subscribing to the activity feed...');
-            await subscribe(ws);
-        });
+        ws.on('error', handleError);
 
-        ws.on('message', async (data) => {
-            const event = parseBuffer(data);
+        ws.on('open', async () => handleOpen(ws));
 
-            // check for subscription success
-            if (event.event === 'subscribed') {
-                console.log('Successfully subscribed!');
-                clearTimeout(retryTimeout);
-                subscriptionRetryCount = 0;
-            }
+        ws.on('message', async (data) => handleMessage(ws, data))
 
-            switch (event.code) {
-                // PONG
-                case 2:
-                    ws.send(3);
-                    break;
-                // EVENT
-                case 42:
-                    await handleFortyTwo(event);
-                    break;
-                default:
-                    return;
-            }
-        })
-
-        ws.on('close', (code, reason) => {
-            console.log(`Websocket closed with code ${code} and reason: ${reason}`);
-
-            console.log('Reconnecting...');
-            setTimeout(() => {
-                connect();
-            }, 1000);
-        });
+        ws.on('close', handleClose);
     } catch (e) {console.log(JSON.stringify(e))}
 }
 //-------------------------\\
